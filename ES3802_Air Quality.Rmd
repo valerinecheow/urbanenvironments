@@ -1,0 +1,523 @@
+---
+title: "ES3802 Air Quality Analysis"
+author: "Fun Jolie Wants To Die"
+date: "2025-03-30"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_depth: 3
+    theme: united
+---
+
+# Data cleaning & Arranging
+
+Load required packages
+```{r, warning=FALSE, message=FALSE}
+#Install packages as needed, honestly you're a noob if you dont own these
+library(ggplot2)
+library(gridExtra)
+library(tidyverse) #for dyplr
+library(corrplot) #correlation plot
+library(readxl)
+```
+
+Load data
+```{r}
+#NOTE: setwd NOT specified, just make sure the file is located the same as the code
+data = read_xlsx("ES3802_Data.xlsx")
+
+#remove 2nd row, its units
+data = data[-1,]
+
+#make sure R recognize it as a numeric
+data$PN <- as.numeric(as.character(data$PN))
+```
+
+Arrange data base on point number in morning and afternoon
+```{r}
+# Arrange by Session and then Point Number
+
+data = data %>%
+  arrange(Session, PN)
+
+#Rename points  to new point number
+data = data %>%
+  mutate(PN = case_when(
+    PN == 8  ~ 6,
+    PN == 13 ~ 10,
+    PN == 17 ~ 14,
+    PN == 20 ~ 17,
+    PN == 22 ~ 19,
+    PN == 24 ~ 21,
+    PN == 26 ~ 23,
+    PN == 29 ~ 26,
+    PN == 30 ~ 27,
+    PN == 27 ~ 24,
+    PN == 28 ~ 25,
+    PN == 25 ~ 22,
+    PN == 23 ~ 20,
+    PN == 21 ~ 18,
+    PN == 19 ~ 16,
+    PN == 16 ~ 13,
+    PN == 12 ~ 9,
+    PN == 7  ~ 5,
+    PN == 3  ~ 2,
+    PN == 6  ~ 4,
+    PN == 11 ~ 8,
+    PN == 15 ~ 12,
+    PN == 18 ~ 15,
+    PN == 14 ~ 11,
+    PN == 10 ~ 7,
+    PN == 5  ~ 3,
+    PN == 2  ~ 1,
+  ))
+```
+
+# Calculate Average, Min & Max
+```{r}
+# Initialize an empty data frame to store results
+result = data.frame(Session = numeric(0), PN = numeric(0), 
+                    Min_PM1 = numeric(0), Max_PM1 = numeric(0), Avg_PM1 = numeric(0),
+                    Min_PM2.5 = numeric(0), Max_PM2.5 = numeric(0), Avg_PM2.5 = numeric(0),
+                    Min_RESP = numeric(0), Max_RESP = numeric(0), Avg_RESP = numeric(0),
+                    Min_PM10 = numeric(0), Max_PM10 = numeric(0), Avg_PM10 = numeric(0),
+                    Min_TOTAL = numeric(0), Max_TOTAL = numeric(0), Avg_TOTAL = numeric(0))
+
+# Ensure the required columns are numeric (coerce them if necessary)
+data$PM1 = as.numeric(as.character(data$PM1))
+data$PM2.5 = as.numeric(as.character(data$PM2.5))
+data$RESP = as.numeric(as.character(data$RESP))
+data$PM10 = as.numeric(as.character(data$PM10))
+data$TOTAL = as.numeric(as.character(data$TOTAL))
+
+# Get unique sessions and point numbers
+sessions = unique(data$Session)
+point_numbers = unique(data$PN)
+
+# Loop through each session and point number
+for (session in sessions) {
+  for (pn in point_numbers) {
+    # Subset data for current session and point number
+    subset_data = data[data$Session == session & data$PN == pn, ]
+    
+    # Calculate min, max, and average for each column
+    min_pm1 = min(subset_data$PM1, na.rm = TRUE)
+    max_pm1 = max(subset_data$PM1, na.rm = TRUE)
+    avg_pm1 = mean(subset_data$PM1, na.rm = TRUE)
+    
+    min_pm25 = min(subset_data$PM2.5, na.rm = TRUE)
+    max_pm25 = max(subset_data$PM2.5, na.rm = TRUE)
+    avg_pm25 = mean(subset_data$PM2.5, na.rm = TRUE)
+    
+    min_resp = min(subset_data$RESP, na.rm = TRUE)
+    max_resp = max(subset_data$RESP, na.rm = TRUE)
+    avg_resp = mean(subset_data$RESP, na.rm = TRUE)
+    
+    min_pm10 = min(subset_data$PM10, na.rm = TRUE)
+    max_pm10 = max(subset_data$PM10, na.rm = TRUE)
+    avg_pm10 = mean(subset_data$PM10, na.rm = TRUE)
+    
+    min_total = min(subset_data$TOTAL, na.rm = TRUE)
+    max_total = max(subset_data$TOTAL, na.rm = TRUE)
+    avg_total = mean(subset_data$TOTAL, na.rm = TRUE)
+    
+    # Append the results to the result data frame
+    result = rbind(result, data.frame(
+      Session = session, PN = pn, 
+      Min_PM1 = min_pm1, Max_PM1 = max_pm1, Avg_PM1 = avg_pm1,
+      Min_PM2.5 = min_pm25, Max_PM2.5 = max_pm25, Avg_PM2.5 = avg_pm25,
+      Min_RESP = min_resp, Max_RESP = max_resp, Avg_RESP = avg_resp,
+      Min_PM10 = min_pm10, Max_PM10 = max_pm10, Avg_PM10 = avg_pm10,
+      Min_TOTAL = min_total, Max_TOTAL = max_total, Avg_TOTAL = avg_total
+    ))
+  }
+}
+```
+
+# Data exploration 
+
+Histogram of average values
+```{r}
+Hist_Avg_PM1 = ggplot(result, aes(x = Avg_PM1)) +
+  geom_histogram(binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Avg_PM1", x = "Avg_PM1", y = "Count") +
+  theme_minimal()
+
+Hist_Avg_PM2.5 = ggplot(result, aes(x = Avg_PM2.5)) +
+  geom_histogram(binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Avg_PM2.5", x = "Avg_PM2.5", y = "Count") +
+  theme_minimal()
+
+Hist_Avg_PM10 = ggplot(result, aes(x = Avg_PM10)) +
+  geom_histogram(binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Avg_PM1", x = "Avg_PM1", y = "Count") +
+  theme_minimal()
+
+Hist_Avg_RESP = ggplot(result, aes(x = Avg_RESP)) +
+  geom_histogram(binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Avg_PM2.5", x = "Avg_PM2.5", y = "Count") +
+  theme_minimal()
+
+Hist_Avg_TOTAL = ggplot(result, aes(x = Avg_TOTAL)) +
+  geom_histogram(binwidth = 0.001, fill = "lightblue", color = "black", alpha = 0.7) +
+  labs(title = "Histogram of Avg_PM1", x = "Avg_PM1", y = "Count") +
+  theme_minimal()
+
+print(Hist_Avg_PM1)
+print(Hist_Avg_PM2.5)
+print(Hist_Avg_PM10)
+print(Hist_Avg_RESP)
+print(Hist_Avg_TOTAL)
+
+```
+Data is NOT normally distributed, and there is some outliers ~0.04 (yay david)
+
+# Data Analysis
+Is there a difference between in the average value for each point number between the 2 session?
+
+Use a for loop to iterate over each parameter and perform the paired t-test for point
+```{r}
+S1_PM1 = result[result$Session == 1, "Avg_PM1"]
+S2_PM1 = result[result$Session == 2, "Avg_PM1"]
+
+S1_PM2.5 = result[result$Session == 1, "Avg_PM2.5"]
+S2_PM2.5 = result[result$Session == 2, "Avg_PM2.5"]
+
+S1_PM10 = result[result$Session == 1, "Avg_PM10"]
+S2_PM10 = result[result$Session == 2, "Avg_PM10"]
+
+S1_RESP = result[result$Session == 1, "Avg_RESP"]
+S2_RESP = result[result$Session == 2, "Avg_RESP"]
+
+S1_TOTAL = result[result$Session == 1, "Avg_TOTAL"]
+S2_TOTAL = result[result$Session == 2, "Avg_TOTAL"]
+
+ttest_PM1 = t.test(S1_PM1, S2_PM1)
+ttest_PM2.5 = t.test(S1_PM2.5, S2_PM2.5)
+ttest_PM10 = t.test(S1_PM10, S2_PM10)
+ttest_RESP = t.test(S1_RESP, S2_RESP)
+ttest_TOTAL = t.test(S1_TOTAL, S2_TOTAL)
+
+print(ttest_PM1)
+print(ttest_PM2.5)
+print(ttest_PM10)
+print(ttest_RESP)
+print(ttest_TOTAL)
+```
+Welch two sample t-test shows that there is no difference in the values between the parameters taken in the morning and in the afternoon
+
+
+
+Plot for visualisation
+```{r}
+# Combine the data into a single data frame
+PM1 = data.frame(
+  Point = rep(1:length(S1_PM1), 2),  # Repeat the point numbers for both sessions
+  PM1 = c(S1_PM1, S2_PM1),           # Combine S1 and S2 PM1 values
+  Session = rep(c("Session 1", "Session 2"), each = length(S1_PM1))  # Label the sessions
+)
+
+# Create the ggplot
+PM1_plot = ggplot(PM1, aes(x = Point, y = PM1, color = Session)) +
+  geom_point() +                      # Add points
+  geom_line() +                       # Add lines connecting the points
+  labs(x = "Point Number", y = "PM1 Values", title = "Comparison of PM1 for Session 1 and Session 2") +
+  scale_color_manual(values = c("blue", "red")) +  # Custom colors for each session
+  theme_minimal()         
+
+# For PM2.5
+PM2.5 <- data.frame(
+  Point = rep(1:length(S1_PM2.5), 2),  # Repeat the point numbers for both sessions
+  PM2.5 = c(S1_PM2.5, S2_PM2.5),       # Combine S1 and S2 PM2.5 values
+  Session = rep(c("Session 1", "Session 2"), each = length(S1_PM2.5))  # Label the sessions
+)
+
+# Create the ggplot for PM2.5
+PM2.5_plot <- ggplot(PM2.5, aes(x = Point, y = PM2.5, color = Session)) +
+  geom_point() +                         # Add points
+  geom_line() +                          # Add lines connecting the points
+  labs(x = "Point Number", y = "PM2.5 Values", title = "Comparison of PM2.5 for Session 1 and Session 2") +
+  scale_color_manual(values = c("blue", "red")) +  # Custom colors for each session
+  theme_minimal()                         # Clean theme
+
+# For PM10
+PM10 <- data.frame(
+  Point = rep(1:length(S1_PM10), 2),  # Repeat the point numbers for both sessions
+  PM10 = c(S1_PM10, S2_PM10),         # Combine S1 and S2 PM10 values
+  Session = rep(c("Session 1", "Session 2"), each = length(S1_PM10))  # Label the sessions
+)
+
+# Create the ggplot for PM10
+PM10_plot <- ggplot(PM10, aes(x = Point, y = PM10, color = Session)) +
+  geom_point() +                         # Add points
+  geom_line() +                          # Add lines connecting the points
+  labs(x = "Point Number", y = "PM10 Values", title = "Comparison of PM10 for Session 1 and Session 2") +
+  scale_color_manual(values = c("blue", "red")) +  # Custom colors for each session
+  theme_minimal()                         # Clean theme
+
+# For RESP
+RESP <- data.frame(
+  Point = rep(1:length(S1_RESP), 2),  # Repeat the point numbers for both sessions
+  RESP = c(S1_RESP, S2_RESP),         # Combine S1 and S2 RESP values
+  Session = rep(c("Session 1", "Session 2"), each = length(S1_RESP))  # Label the sessions
+)
+
+# Create the ggplot for RESP
+RESP_plot <- ggplot(RESP, aes(x = Point, y = RESP, color = Session)) +
+  geom_point() +                         # Add points
+  geom_line() +                          # Add lines connecting the points
+  labs(x = "Point Number", y = "RESP Values", title = "Comparison of RESP for Session 1 and Session 2") +
+  scale_color_manual(values = c("blue", "red")) +  # Custom colors for each session
+  theme_minimal()                         # Clean theme
+
+# For TOTAL
+TOTAL <- data.frame(
+  Point = rep(1:length(S1_TOTAL), 2),  # Repeat the point numbers for both sessions
+  TOTAL = c(S1_TOTAL, S2_TOTAL),       # Combine S1 and S2 TOTAL values
+  Session = rep(c("Session 1", "Session 2"), each = length(S1_TOTAL))  # Label the sessions
+)
+
+# Create the ggplot for TOTAL
+TOTAL_plot <- ggplot(TOTAL, aes(x = Point, y = TOTAL, color = Session)) +
+  geom_point() +                         # Add points
+  geom_line() +                          # Add lines connecting the points
+  labs(x = "Point Number", y = "TOTAL Values", title = "Comparison of TOTAL for Session 1 and Session 2") +
+  scale_color_manual(values = c("blue", "red")) +  # Custom colors for each session
+  theme_minimal()                         # Clean theme
+# Clean theme
+```
+
+
+Print and save the plots
+```{r}
+print(PM1_plot)
+ggsave("PM1.png", plot = last_plot(), width = 8, height = 6, dpi = 300)
+print(PM2.5_plot)
+ggsave("PM2.5.png", plot = last_plot(), width = 8, height = 6, dpi = 300)
+print(PM10_plot)
+ggsave("PM10.png", plot = last_plot(), width = 8, height = 6, dpi = 300)
+print(RESP_plot)
+ggsave("RESP.png", plot = last_plot(), width = 8, height = 6, dpi = 300)
+print(TOTAL_plot)
+ggsave("TOTAL.png", plot = last_plot(), width = 8, height = 6, dpi = 300)
+
+```
+## ANOVA: significant difference in PM by distance (S1) 
+See if there is a significant difference in PM in distance from source in session 1
+```{r}
+#row 1 is closest to source, row 4 is furthest from source
+
+# Find the average values for specific points in Session 1
+row1 = c(6, 12, 14, 17, 19)
+
+# Use the subset to filter the rows for Session 1 and the specific points
+row1data = result[result$Session == 1 & result$PN %in% row1, ]
+
+# Calculate the mean for each parameter (Avg_PM1, Avg_PM2.5, Avg_PM10, Avg_RESP, Avg_TOTAL)
+avg_values1 = colMeans(row1data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+
+# Repeat for other rows
+
+# Find the average values for specific points in Session 1
+row2 = c(5, 9, 13, 16)
+
+# Use the subset to filter the rows for Session 1 and the specific points
+row2data = result[result$Session == 1 & result$PN %in% row2, ]
+
+# Calculate the mean for each parameter (Avg_PM1, Avg_PM2.5, Avg_PM10, Avg_RESP, Avg_TOTAL)
+avg_values2 = colMeans(row2data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+
+
+# Find the average values for specific points in Session 1
+row3 = c(2, 4, 8, 12)
+
+# Use the subset to filter the rows for Session 1 and the specific points
+row3data = result[result$Session == 1 & result$PN %in% row3, ]
+
+# Calculate the mean for each parameter (Avg_PM1, Avg_PM2.5, Avg_PM10, Avg_RESP, Avg_TOTAL)
+avg_values3 = colMeans(row3data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+
+# Find the average values for specific points in Session 1
+row4 = c(1, 3, 7)
+
+# Use the subset to filter the rows for Session 1 and the specific points
+row4data = result[result$Session == 1 & result$PN %in% row4, ]
+
+# Calculate the mean for each parameter (Avg_PM1, Avg_PM2.5, Avg_PM10, Avg_RESP, Avg_TOTAL)
+avg_values4 = colMeans(row4data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+```
+
+```{r}
+# Combine the data for the different rows into a single data frame for analysis
+# Create a new column "Row" to indicate the distance category (Row 1, Row 2, etc.)
+
+# Combine row data into one dataframe for analysis
+row_data <- rbind(
+  data.frame(Distance = "Row 1", result[result$Session == 1 & result$PN %in% c(6, 12, 14, 17, 19), 
+                                        c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", 
+                                          "Avg_RESP", "Avg_TOTAL")]),
+  
+  data.frame(Distance = "Row 2", result[result$Session == 1 & result$PN %in% c(5, 9, 13, 16), 
+                                        c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", 
+                                          "Avg_RESP", "Avg_TOTAL")]),
+  
+  data.frame(Distance = "Row 3", result[result$Session == 1 & result$PN %in% c(2, 4, 8, 12), 
+                                        c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", 
+                                          "Avg_RESP", "Avg_TOTAL")]),
+  
+  data.frame(Distance = "Row 4", result[result$Session == 1 & result$PN %in% c(1, 3, 7), 
+                                        c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", 
+                                          "Avg_RESP", "Avg_TOTAL")])
+)
+
+# Run ANOVA for each parameter (PM1, PM2.5, PM10, RESP, TOTAL)
+params <- c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")
+anova_results <- list()
+
+for (param in params) {
+  # Perform ANOVA for each parameter
+  anova_result <- aov(get(param) ~ Distance, data = row_data)
+  
+  # Store the result
+  anova_results[[param]] <- summary(anova_result)
+}
+
+# Print the results of the ANOVA tests
+for (param in names(anova_results)) {
+  cat(paste("ANOVA results for", param, ":\n"))
+  print(anova_results[[param]])
+  cat("\n")
+}
+```
+Avg_PM1:
+p-value = 0.00213 (Significant at the 0.01 level). There is a statistically 
+significant difference in the mean PM1 values across the different distances 
+from the source (Row 1, Row 2, Row 3, Row 4).
+
+Avg_PM2.5 = 
+p-value = 0.00192 (Significant at the 0.01 level). There is a statistically 
+significant difference in the mean PM2.5 values across the different distances
+from the source.
+
+Avg_PM10 =
+p-value = 0.00123 (Significant at the 0.01 level). There is a statistically
+significant difference in the mean PM10 values across the different distances
+from the source.
+
+Avg_RESP:
+p-value = 0.00133 (Significant at the 0.01 level). There is a statistically
+significant difference in the mean RESP values across the different distances
+from the source.
+
+Avg_TOTAL:
+p-value = 0.0719 (Not significant at the 0.05 level). There is no statistically
+significant difference in the mean TOTAL values across the different distances
+from the source.
+The result is marginally significant at the 0.1 level (p = 0.0719).
+
+## ANOVA: significant difference in PM by distance (S2) 
+```{r}
+# Find the average values for specific points in Session 2
+row1 = c(6, 12, 14, 17, 19)
+
+# Use the subset to filter the rows for Session 2 and the specific points
+row1data = result[result$Session == 2 & result$PN %in% row1, ]
+
+# Calculate the mean for each parameter (Avg_PM1, Avg_PM2.5, Avg_PM10, Avg_RESP, Avg_TOTAL)
+avg_values1 = colMeans(row1data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+
+# Repeat for other rows
+
+# Find the average values for specific points in Session 2
+row2 = c(5, 9, 13, 16)
+
+# Use the subset to filter the rows for Session 2 and the specific points
+row2data = result[result$Session == 2 & result$PN %in% row2, ]
+
+# Calculate the mean for each parameter
+avg_values2 = colMeans(row2data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+
+# Find the average values for specific points in Session 2
+row3 = c(2, 4, 8, 12)
+
+# Use the subset to filter the rows for Session 2 and the specific points
+row3data = result[result$Session == 2 & result$PN %in% row3, ]
+
+# Calculate the mean for each parameter
+avg_values3 = colMeans(row3data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+
+# Find the average values for specific points in Session 2
+row4 = c(1, 3, 7)
+
+# Use the subset to filter the rows for Session 2 and the specific points
+row4data = result[result$Session == 2 & result$PN %in% row4, ]
+
+# Calculate the mean for each parameter
+avg_values4 = colMeans(row4data[, c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+
+```
+
+```{r}
+# Combine row data into one dataframe for analysis
+# Create a new column "Row" to indicate the distance category (Row 1, Row 2, etc.)
+
+row_data <- rbind(
+  data.frame(Distance = "Row 1", result[result$Session == 2 & result$PN %in% c(6, 12, 14, 17, 19), c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")]),
+  data.frame(Distance = "Row 2", result[result$Session == 2 & result$PN %in% c(5, 9, 13, 16), c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")]),
+  data.frame(Distance = "Row 3", result[result$Session == 2 & result$PN %in% c(2, 4, 8, 12), c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")]),
+  data.frame(Distance = "Row 4", result[result$Session == 2 & result$PN %in% c(1, 3, 7), c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")])
+)
+
+# Run ANOVA for each parameter (PM1, PM2.5, PM10, RESP, TOTAL)
+params <- c("Avg_PM1", "Avg_PM2.5", "Avg_PM10", "Avg_RESP", "Avg_TOTAL")
+anova_results <- list()
+
+for (param in params) {
+  # Perform ANOVA for each parameter
+  anova_result <- aov(get(param) ~ Distance, data = row_data)
+  
+  # Store the result
+  anova_results[[param]] <- summary(anova_result)
+}
+
+# Print the results of the ANOVA tests
+for (param in names(anova_results)) {
+  cat(paste("ANOVA results for", param, ":\n"))
+  print(anova_results[[param]])
+  cat("\n")
+}
+
+```
+Avg_PM1:
+p-value = 0.37 (Not significant at the 0.05 level)
+There is no statistically significant difference in the mean PM1 values across 
+the different distances from the source.
+
+Avg_PM2.5:
+p-value = 0.359 (Not significant at the 0.05 level)
+There is no statistically significant difference in the mean PM2.5 values across 
+the different distances from the source.
+
+Avg_PM10:
+p-value = 0.417 (Not significant at the 0.05 level)
+There is no statistically significant difference in the mean PM10 values across 
+the different distances from the source.
+
+Avg_RESP:
+p-value = 0.338 (Not significant at the 0.05 level)
+There is no statistically significant difference in the mean RESP values across 
+the different distances from the source.
+
+Avg_TOTAL:
+p-value = 0.48 (Not significant at the 0.05 level)
+There is no statistically significant difference in the mean TOTAL values across the different distances from the source.
+
+# Is there significance difference Between buildings & vegetation 
+```{r}
+
+
+```
